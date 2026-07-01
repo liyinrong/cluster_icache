@@ -324,23 +324,25 @@ module snitch_icache_lookup_serial
   // Fall-through buffer the read data: Store the read data if the SRAM bank accepted a request in
   // the previous cycle and if we actually have to buffer them because the receiver is not ready
   `FFL(data_rsp_q, proper_rdata, tag_handshake && !data_ready, '0, clk_i, rst_ni)
-  assign proper_rdata = refill_hit_q && !data_req_q.hit ? refill_wdata_q : data_rdata;
+  // Coincident refill write preempts the data read; serve refill data even on a tag hit.
+  assign proper_rdata = refill_hit_q ? refill_wdata_q : data_rdata;
   assign out_data_o = tag_handshake ? proper_rdata : data_rsp_q;
 
   // Check immediate refill for possible match
   assign refill_hit_d = write_valid_i && write_tag_i == required_tag &&
       write_addr_i == data_req_d.addr[CFG.LINE_ALIGN+:CFG.COUNT_ALIGN];
+  // Bind payload capture to the handshake so a later refill can't overwrite it during a stall.
   `FFL(refill_hit_q, refill_hit_d, tag_valid && tag_ready, '0, clk_i, rst_ni)
-  `FFL(refill_wdata_q, write_data_i, refill_hit_d, '0, clk_i, rst_ni)
-  `FFL(write_way_q, write_way_i, refill_hit_d, '0, clk_i, rst_ni)
-  `FFL(write_error_q, write_error_i, refill_hit_d, '0, clk_i, rst_ni)
+  `FFL(refill_wdata_q, write_data_i, refill_hit_d && tag_valid && tag_ready, '0, clk_i, rst_ni)
+  `FFL(write_way_q, write_way_i, refill_hit_d && tag_valid && tag_ready, '0, clk_i, rst_ni)
+  `FFL(write_error_q, write_error_i, refill_hit_d && tag_valid && tag_ready, '0, clk_i, rst_ni)
 
   // Generate the remaining output signals.
   assign out_addr_o  = data_req_q.addr;
   assign out_id_o    = data_req_q.id;
-  assign out_way_o   = refill_hit_q && !data_req_q.hit ? write_way_q : data_req_q.cway;
+  assign out_way_o   = refill_hit_q ? write_way_q : data_req_q.cway;
   assign out_hit_o   = refill_hit_q || data_req_q.hit;
-  assign out_error_o = refill_hit_q && !data_req_q.hit ? write_error_q : data_req_q.error;
+  assign out_error_o = refill_hit_q ? write_error_q : data_req_q.error;
   assign out_valid_o = data_valid;
   assign data_ready  = out_ready_i;
 
