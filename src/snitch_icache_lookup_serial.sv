@@ -163,9 +163,9 @@ module snitch_icache_lookup_serial
         .WriteAddr  (tag_addr),
         .WriteData  (tag_wdata)
       );
-      assign sram_cfg_out_tag_o = '0;
 
     end
+    assign sram_cfg_out_tag_o = '0;
   end else begin : gen_sram
     logic [CFG.WAY_COUNT*(CFG.TAG_WIDTH+2)-1:0] tag_rdata_flat;
     for (genvar i = 0; i < CFG.WAY_COUNT; i++) begin : g_ways_rdata
